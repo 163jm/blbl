@@ -252,6 +252,8 @@ class PlayerActivity : BaseActivity() {
     internal var partsListUiCards: List<VideoCard> = emptyList()
     internal var partsListIndex: Int = -1
     internal var partsOrderReversed: Boolean = false
+    // 分P 条带是否由用户主动开启。默认隐藏，点 btn_detail 切换。
+    internal var partsStripEnabled: Boolean = false
     internal var partsListContinuation: PlayerPlaylistContinuation? = null
     internal var partsListLoadMoreJob: Job? = null
     internal val partsListLoadMoreCallbacks = ArrayList<(Boolean) -> Unit>()
@@ -2102,8 +2104,8 @@ class PlayerActivity : BaseActivity() {
 
         binding.btnDetail.setOnClickListener {
             // 第 8 个按钮不再打开 VideoDetailActivity（页面已删除），
-            // 改为聚焦到分P 横滚条（如果可见，否则提示用户当前没有分P）。
-            focusPlayerPartsStrip()
+            // 改为切换底部导航栏之上的分P 横滚条显隐。
+            togglePlayerPartsStrip()
             setControlsVisible(true)
         }
 

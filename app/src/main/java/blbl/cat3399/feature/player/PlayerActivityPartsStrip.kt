@@ -65,15 +65,19 @@ internal fun PlayerActivity.initPlayerPartsStrip() {
  * Called by `notifyPartsListPanelChanged` (and any time parts are mutated).
  * Re-evaluates visibility against the current `bottom_bar`/OSD state and
  * repopulates the strip with the current parts.
+ *
+ * The strip is hidden by default — `partsStripEnabled` is only flipped to
+ * true via the `btn_detail` click (togglePlayerPartsStrip). This avoids
+ * surprise UI on first entry.
  */
 internal fun PlayerActivity.refreshPlayerPartsStripContent() {
     val safeBottomVisible = binding.bottomBar.visibility == View.VISIBLE
     val cards = resolvePartsStripCards()
-    val hasParts = cards.isNotEmpty()
 
     // The strip is meaningful only with multiple parts; a single part is still
-    // the current video so showing a one-card rail is wasted space.
-    val shouldShow = safeBottomVisible && cards.size > 1
+    // the current video so showing a one-card rail is wasted space. Stay hidden
+    // when the user hasn't opted in via btn_detail.
+    val shouldShow = partsStripEnabled && safeBottomVisible && cards.size > 1
     binding.partsStripPanel.visibility = if (shouldShow) View.VISIBLE else View.GONE
     if (!shouldShow) return
 
@@ -140,22 +144,29 @@ private fun PlayerActivity.resolvePartsStripCards(): List<VideoCard> {
 }
 
 /**
- * Move focus into the parts strip on a single, visible row of cards.
- * Used by the former "btn_detail" 8th-button click.
+ * Toggle the parts strip. Used by the "btn_detail" 8th-button click:
+ * - off → on: focus the currently playing card (default hidden -> now shown)
+ * - on  → off: hide
+ * - no parts / only 1 part: shows a toast, leaves state untouched.
  */
-internal fun PlayerActivity.focusPlayerPartsStrip() {
-    val panelVisible = binding.partsStripPanel.visibility == View.VISIBLE
-    if (!panelVisible) {
+internal fun PlayerActivity.togglePlayerPartsStrip() {
+    val cards = resolvePartsStripCards()
+    if (cards.size <= 1) {
         AppToast.show(this, "当前没有分P列表")
         return
     }
-    val count = binding.recyclerPartsStrip.adapter?.itemCount ?: 0
-    if (count <= 0) return
+    partsStripEnabled = !partsStripEnabled
+    // Make sure the bottom_bar is visible so the strip can render.
+    if (partsStripEnabled && binding.bottomBar.visibility != View.VISIBLE) {
+        // setControlsVisible(true) refreshes the strip; the caller also calls it.
+    }
+    refreshPlayerPartsStripContent()
+    if (!partsStripEnabled) return
 
-    val targetIndex = currentPartsStripDisplayIndex().takeIf { it in 0 until count } ?: 0
-    binding.recyclerPartsStrip.scrollToPosition(targetIndex)
-
+    // Focus the currently playing card (or first) once the refresh has settled.
+    val targetIndex = currentPartsStripDisplayIndex().takeIf { it in 0 until cards.size } ?: 0
     binding.recyclerPartsStrip.post {
+        if (binding.partsStripPanel.visibility != View.VISIBLE) return@post
         val holder = binding.recyclerPartsStrip.findViewHolderForAdapterPosition(targetIndex)
         val target =
             holder?.itemView?.takeIf { it.isFocusable && it.visibility == View.VISIBLE }
