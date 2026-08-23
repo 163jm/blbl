@@ -6,6 +6,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import blbl.cat3399.R
 import blbl.cat3399.core.model.VideoCard
+import blbl.cat3399.core.net.BiliClient
+import blbl.cat3399.core.prefs.AppPrefs
 import blbl.cat3399.core.ui.AppToast
 import blbl.cat3399.feature.video.VideoCardAdapter
 
@@ -58,7 +60,26 @@ internal fun PlayerActivity.initPlayerPartsStrip() {
         refreshPlayerPartsStripContent()
     }
 
+    syncPartsStripButtonVisibility()
     refreshPlayerPartsStripContent()
+}
+
+/**
+ * 根据当前分P列表是否充分收缩或显示 `btn_detail`：
+ * - OSD 配置未开启 → 直接忽略（applyOsdButtonsVisibility 处理）
+ * - fetch 未完成 → 暂不收缩（fetch 完成后 refreshPlayerPartsStripContent 会再同步）
+ * - fetch 完成且没有多分P → 强制 GONE，避免用户点到死按钮
+ */
+internal fun PlayerActivity.syncPartsStripButtonVisibility() {
+    val osdEnabled = BiliClient.prefs.playerOsdButtons.toSet()
+        .contains(AppPrefs.PLAYER_OSD_BTN_DETAIL)
+    if (!osdEnabled) return
+    val fetchInFlight = partsListFetchJob?.isActive == true
+    val hasMultipleParts = partsListItems.size > 1
+    val target = if (fetchInFlight || hasMultipleParts) View.VISIBLE else View.GONE
+    if (binding.btnDetail.visibility != target) {
+        binding.btnDetail.visibility = target
+    }
 }
 
 /**
@@ -71,6 +92,7 @@ internal fun PlayerActivity.initPlayerPartsStrip() {
  * surprise UI on first entry.
  */
 internal fun PlayerActivity.refreshPlayerPartsStripContent() {
+    syncPartsStripButtonVisibility()
     val safeBottomVisible = binding.bottomBar.visibility == View.VISIBLE
     val cards = resolvePartsStripCards()
 

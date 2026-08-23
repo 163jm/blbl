@@ -39,6 +39,10 @@ internal fun PlayerActivity.applyOsdButtonsVisibility() {
     binding.btnClosePlayer.visibility = if (enabled.contains(AppPrefs.PLAYER_OSD_BTN_CLOSE_PLAYER)) View.VISIBLE else View.GONE
     if (binding.btnLike.visibility != View.VISIBLE) cancelLikeButtonHoldGesture(resetTriggered = true)
 
+    // 按当前分P列表状态收缩 btn_detail：没有多分P时不显示该按钮，
+    // 避免用户点击后弹出"当前没有分P列表"。
+    syncPartsStripButtonVisibility()
+
     updateActionButtonsUi()
     updatePlaylistControls()
 
