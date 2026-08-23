@@ -252,8 +252,9 @@ class PlayerActivity : BaseActivity() {
     internal var partsListUiCards: List<VideoCard> = emptyList()
     internal var partsListIndex: Int = -1
     internal var partsOrderReversed: Boolean = false
-    // 分P 条带是否由用户主动开启。默认隐藏，点 btn_detail 切换。
-    internal var partsStripEnabled: Boolean = false
+    // 沉浸式分P 选择模式：进入后隐藏 OSD，分P 横滚列表独占底部，焦点跳第一张卡片。
+    // 默认为 false，点 btn_detail toggle；BACK/DOWN/B 退出。
+    internal var immersivePartsMode: Boolean = false
     internal var partsListContinuation: PlayerPlaylistContinuation? = null
     internal var partsListLoadMoreJob: Job? = null
     internal val partsListLoadMoreCallbacks = ArrayList<(Boolean) -> Unit>()
@@ -1446,6 +1447,18 @@ class PlayerActivity : BaseActivity() {
         }
 
         if (dispatchSponsorSubmitPanelKey(event)) return true
+
+        // 沉浸式分P 模式：BACK/ESCAPE/B 先退出沉浸，再走默认逻辑。
+        if (
+            immersivePartsMode &&
+            (keyCode == KeyEvent.KEYCODE_BACK ||
+                keyCode == KeyEvent.KEYCODE_ESCAPE ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_B) &&
+            event.action == KeyEvent.ACTION_DOWN
+        ) {
+            exitImmersivePartsMode()
+            return true
+        }
 
         if (isBottomCardPanelVisible()) {
             val focused = currentFocus

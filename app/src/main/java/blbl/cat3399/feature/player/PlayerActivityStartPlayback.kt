@@ -254,7 +254,7 @@ internal fun PlayerActivity.resetPlaybackStateForNewMedia(
         partsListUiCards = emptyList()
         partsListIndex = -1
         partsOrderReversed = false
-        partsStripEnabled = false
+        immersivePartsMode = false
         partsListContinuation = null
     }
 
@@ -702,7 +702,7 @@ internal suspend fun PlayerActivity.refreshPartsListFromDetail(detail: VideoDeta
         partsListUiCards = emptyList()
         partsListIndex = -1
         partsOrderReversed = false
-        partsStripEnabled = false
+        immersivePartsMode = false
         partsListContinuation = null
 
         val reused =
@@ -728,7 +728,7 @@ internal suspend fun PlayerActivity.refreshPartsListFromDetail(detail: VideoDeta
     partsListUiCards = emptyList()
     partsListIndex = -1
     partsOrderReversed = false
-    partsStripEnabled = false
+    immersivePartsMode = false
     partsListContinuation = null
 
     if (safeBvid.isBlank()) return

@@ -87,6 +87,13 @@ internal fun PlayerActivity.setControlsVisible(visible: Boolean) {
     updatePersistentBottomProgressBarVisibility()
     onTouchOverlayStateChanged()
     refreshPlayerPartsStripContent()
+    // 沉浸式分P模式：OSD 被用户主动关闭，覆盖常规 setControlsVisible 的恢复。
+    // 仅隐藏底部栏；顶部栏保留可见，方便用户看标题/返回。
+    if (immersivePartsMode) {
+        binding.bottomBar.visibility = View.GONE
+        binding.controlsRow.visibility = View.GONE
+        binding.tvTime.visibility = View.GONE
+    }
     if (show) noteUserInteraction() else autoHideJob?.cancel()
 }
 
