@@ -17,4 +17,9 @@ local.properties
 *.apk
 keystore/
 docs/
-libs/
+
+# Keep the ijkplayer prebuilt AAR under app/libs/ (required by CI), ignore
+# other stray libs dirs elsewhere in the tree.
+libs/*
+!app/libs/
+!app/libs/*.aar
