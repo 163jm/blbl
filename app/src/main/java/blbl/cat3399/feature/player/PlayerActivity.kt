@@ -2099,8 +2099,13 @@ class PlayerActivity : BaseActivity() {
         }
 
         binding.btnDetail.setOnClickListener {
-            openCurrentMediaDetail()
-            setControlsVisible(true)
+            if (partsListItems.size > 1) {
+                // 有分P时：不跳转详情页，改为底部横向分P卡片栏，焦点直达当前分P，方便遥控器左右切换后按确认播放。
+                showListPanel(kind = PlayerVideoListKind.PARTS, preferContentFocus = true)
+            } else {
+                openCurrentMediaDetail()
+                setControlsVisible(true)
+            }
         }
 
         binding.btnSubtitle.setOnClickListener {

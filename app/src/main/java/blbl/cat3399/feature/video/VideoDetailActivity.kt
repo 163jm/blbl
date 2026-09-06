@@ -742,8 +742,8 @@ class VideoDetailActivity : BaseActivity() {
         if (seasonOrderReversed) currentUgcSeasonUiCards.asReversed() else currentUgcSeasonUiCards
 
     private fun buildPartsHeaderText(cardsCount: Int): String? {
-        if (cardsCount <= 1) return null
-        return "分P（$cardsCount）"
+        // 分P 列表已迁移到播放页内的分P选择栏，视频详情页不再展示。
+        return null
     }
 
     private fun buildSeasonHeaderText(): String? {
