@@ -18,6 +18,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -26,13 +27,20 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 object ApkUpdater {
-    private const val DEBUG_APK_URL = "https://cat3399.top/blbl/blbl-latest-debug.apk"
-    private const val RELEASE_APK_URL = "https://cat3399.top/blbl/blbl-latest-release.apk"
-    private const val CHANGELOG_URL = "https://cat3399.top/blbl/CHANGELOG.md"
+    // GitHub 仓库：发布产物推送到该仓库的 release 分支（latest.txt + APK），
+    // 同时也会创建 GitHub Release 作为兜底数据源。
+    private const val GITHUB_OWNER = "163jm"
+    private const val GITHUB_REPO = "blbl"
+
+    private const val JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@release"
+    private const val JSDELIVR_LATEST_TXT_URL = "$JSDELIVR_BASE/latest.txt"
+    private const val GITHUB_LATEST_RELEASE_API_URL =
+        "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+
     val TEST_APK_URL: String
-        get() = if (BuildConfig.DEBUG) DEBUG_APK_URL else RELEASE_APK_URL
+        get() = apkUrlFor(BuildConfig.VERSION_NAME)
     val TEST_CHANGELOG_URL: String
-        get() = CHANGELOG_URL
+        get() = JSDELIVR_LATEST_TXT_URL
 
     private const val COOLDOWN_MS = 5_000L
 
@@ -81,9 +89,14 @@ object ApkUpdater {
         }
     }
 
+    /**
+     * @param apkUrl 已知的 APK 直链（GitHub Release 场景下从 release 资源里直接拿到，
+     *   避免再按命名规则拼接一次）。为空时使用 [apkUrlFor] 按版本号拼接 jsDelivr 直链。
+     */
     data class RemoteUpdate(
         val versionName: String,
-        val changelog: String,
+        val changelog: String = "",
+        val apkUrl: String? = null,
         val versions: List<RemoteUpdate> = emptyList(),
     ) {
         val displayChangelog: String
@@ -100,101 +113,98 @@ object ApkUpdater {
         return left.coerceAtLeast(0)
     }
 
-    suspend fun fetchLatestUpdate(
-        url: String = TEST_CHANGELOG_URL,
-    ): RemoteUpdate {
+    /**
+     * 获取最新版本信息。优先走 jsDelivr（对 release 分支里的 latest.txt 做 CDN 加速缓存），
+     * 失败（网络问题 / jsDelivr 缓存还没同步到新分支等）时回退到 GitHub Releases API 直接查询。
+     */
+    suspend fun fetchLatestUpdate(url: String = TEST_CHANGELOG_URL): RemoteUpdate {
         return withContext(Dispatchers.IO) {
-            var lastError: Throwable? = null
-            val maxAttempts = 3
-            for (attempt in 1..maxAttempts) {
-                ensureActive()
-                try {
-                    return@withContext fetchLatestUpdateOnce(url)
-                } catch (t: Throwable) {
-                    if (t is CancellationException) throw t
-                    lastError = t
-                    val shouldRetry =
-                        attempt < maxAttempts &&
-                            (t is IOException || t.message?.startsWith("HTTP ") == true)
-                    if (!shouldRetry) throw t
-                    delay(400L * attempt)
-                }
+            try {
+                fetchLatestUpdateFromJsDelivr(url)
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                fetchLatestUpdateFromGithubRelease()
             }
-            throw lastError ?: IllegalStateException("fetch latest version failed")
         }
     }
 
-    private fun fetchLatestUpdateOnce(url: String): RemoteUpdate {
+    private suspend fun fetchLatestUpdateFromJsDelivr(url: String): RemoteUpdate {
+        var lastError: Throwable? = null
+        val maxAttempts = 3
+        for (attempt in 1..maxAttempts) {
+            try {
+                val versionName = fetchLatestTxtOnce(url)
+                return RemoteUpdate(versionName = versionName, apkUrl = apkUrlFor(versionName))
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                lastError = t
+                val shouldRetry =
+                    attempt < maxAttempts &&
+                        (t is IOException || t.message?.startsWith("HTTP ") == true)
+                if (!shouldRetry) throw t
+                delay(400L * attempt)
+            }
+        }
+        throw lastError ?: IllegalStateException("fetch latest version failed")
+    }
+
+    private fun fetchLatestTxtOnce(url: String): String {
         val req =
             Request.Builder()
                 .url(url)
                 .header("Cache-Control", "no-cache")
                 .get()
                 .build()
-        val call = okHttp.newCall(req)
-        val res = call.execute()
-        res.use { r ->
+        okHttp.newCall(req).execute().use { r ->
             check(r.isSuccessful) { "HTTP ${r.code} ${r.message}" }
             val body = r.body ?: error("empty body")
-            return parseChangelog(body.string())
+            val versionName = body.string().trim().removePrefix("v")
+            check(versionName.isNotBlank()) { "latest.txt 为空" }
+            check(parseVersion(versionName) != null) { "latest.txt 内容不是合法版本号: $versionName" }
+            return versionName
         }
     }
 
-    internal fun parseChangelog(raw: String): RemoteUpdate {
-        val versions = parseChangelogVersions(raw)
-        return versions.first().copy(versions = versions)
-    }
+    private fun fetchLatestUpdateFromGithubRelease(): RemoteUpdate {
+        val req =
+            Request.Builder()
+                .url(GITHUB_LATEST_RELEASE_API_URL)
+                .header("Accept", "application/vnd.github+json")
+                .get()
+                .build()
+        okHttp.newCall(req).execute().use { r ->
+            check(r.isSuccessful) { "HTTP ${r.code} ${r.message}" }
+            val body = r.body ?: error("empty body")
+            val json = JSONObject(body.string())
+            val tagName = json.optString("tag_name").trim()
+            val versionName = tagName.removePrefix("v").trim()
+            check(versionName.isNotBlank()) { "GitHub Release 未返回版本号" }
+            val changelog = json.optString("body").trim()
 
-    internal fun parseChangelogVersions(raw: String): List<RemoteUpdate> {
-        val normalized = raw.replace("\r\n", "\n").replace('\r', '\n').trim()
-        check(normalized.isNotBlank()) { "更新日志为空" }
-
-        val lines = normalized.lines()
-        val allHeadings =
-            lines.withIndex()
-                .mapNotNull { (index, line) ->
-                    parseVersionHeading(line)?.let { heading -> index to heading }
+            val assets = json.optJSONArray("assets")
+            var apkUrl: String? = null
+            if (assets != null) {
+                for (i in 0 until assets.length()) {
+                    val asset = assets.optJSONObject(i) ?: continue
+                    val name = asset.optString("name")
+                    if (name.endsWith(".apk", ignoreCase = true)) {
+                        apkUrl = asset.optString("browser_download_url").takeIf { it.isNotBlank() }
+                        break
+                    }
                 }
-        check(allHeadings.isNotEmpty()) { "未找到版本标题" }
+            }
 
-        val versionLevel = allHeadings.first().second.level
-        val headings = allHeadings.filter { (_, heading) -> heading.level == versionLevel }
-        return headings.mapIndexed { index, (headingIndex, heading) ->
-            val nextHeadingIndex = headings.getOrNull(index + 1)?.first ?: lines.size
-            val sectionLines =
-                lines.subList(headingIndex + 1, nextHeadingIndex)
-                    .dropLastWhile { it.isBlank() }
-            val changelog =
-                sectionLines
-                    .joinToString("\n")
-                    .trim()
-
-            RemoteUpdate(
-                versionName = heading.versionName,
+            return RemoteUpdate(
+                versionName = versionName,
                 changelog = changelog,
+                apkUrl = apkUrl,
             )
         }
     }
 
     fun apkUrlFor(versionName: String): String {
         val cleanVersion = versionName.trim().removePrefix("v")
-        val channel = if (BuildConfig.DEBUG) "debug" else "release"
-        return "https://cat3399.top/blbl/blbl-$cleanVersion-$channel.apk"
-    }
-
-    private data class VersionHeading(
-        val level: Int,
-        val versionName: String,
-    )
-
-    private fun parseVersionHeading(line: String): VersionHeading? {
-        val trimmed = line.trim()
-        val match = Regex("""^(#{1,6})\s+\[?v?([0-9]+(?:\.[0-9]+)*(?:[-+][A-Za-z0-9_.-]+)?)\]?(?:\s+.*)?$""").matchEntire(trimmed)
-            ?: return null
-        val level = match.groupValues[1].length
-        val versionName = match.groupValues[2].trim()
-        if (parseVersion(versionName) == null) return null
-        return VersionHeading(level = level, versionName = versionName)
+        return "$JSDELIVR_BASE/blbl-$cleanVersion-release.apk"
     }
 
     fun isRemoteNewer(remoteVersionName: String, currentVersionName: String = BuildConfig.VERSION_NAME): Boolean {

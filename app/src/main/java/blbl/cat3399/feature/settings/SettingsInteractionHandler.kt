@@ -1589,7 +1589,7 @@ class SettingsInteractionHandler(
 
                     is TestUpdateCheckState.UpdateAvailable -> {
                         ApkUpdateFlow.showUpdatePrompt(activity, checkState.update) { selectedUpdate ->
-                            startTestUpdateDownload(selectedUpdate.versionName)
+                            startTestUpdateDownload(selectedUpdate.versionName, selectedUpdate.apkUrl)
                         }
                     }
 
@@ -2798,7 +2798,7 @@ class SettingsInteractionHandler(
                     state.testUpdateCheckedAtMs = System.currentTimeMillis()
                     if (promptIfUpdate && state.testUpdateCheckState is TestUpdateCheckState.UpdateAvailable) {
                         ApkUpdateFlow.showUpdatePrompt(activity, update) { selectedUpdate ->
-                            startTestUpdateDownload(selectedUpdate.versionName)
+                            startTestUpdateDownload(selectedUpdate.versionName, selectedUpdate.apkUrl)
                         }
                     }
                 } catch (_: CancellationException) {
@@ -2811,7 +2811,7 @@ class SettingsInteractionHandler(
             }
     }
 
-    private fun startTestUpdateDownload(latestVersionHint: String? = null) {
+    private fun startTestUpdateDownload(latestVersionHint: String? = null, apkUrl: String? = null) {
         if (testUpdateJob?.isActive == true) {
             AppToast.show(activity, "正在下载更新…")
             return
@@ -2821,7 +2821,7 @@ class SettingsInteractionHandler(
             ApkUpdateFlow.startDownloadAndInstall(
                 activity = activity,
                 latestVersionHint = latestVersionHint,
-                apkUrl = latestVersionHint?.let(ApkUpdater::apkUrlFor),
+                apkUrl = apkUrl ?: latestVersionHint?.let(ApkUpdater::apkUrlFor),
             ) { latestVersion, isNewer ->
                 if (!isNewer && latestVersionHint == null) state.testUpdateCheckState = TestUpdateCheckState.Latest(latestVersion)
                 state.testUpdateCheckedAtMs = System.currentTimeMillis()
