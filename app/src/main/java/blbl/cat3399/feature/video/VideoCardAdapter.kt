@@ -313,7 +313,7 @@ class VideoCardAdapter(
             binding.tvTitle.text = item.title
             val subtitleText =
                 item.pubDateText
-                    ?: if (item.ownerName.isBlank()) "" else "UP ${item.ownerName}"
+                    ?: item.ownerName.trim()
             binding.tvSubtitle.text = subtitleText
             val pubDateText = item.pubDate?.let { Format.pubDateText(it) }.orEmpty()
             binding.tvPubdate.text = pubDateText
