@@ -799,7 +799,7 @@ class AppPrefs(context: Context) {
         }
 
     var playerPlaybackMode: String
-        get() = PlayerPlaybackModes.normalize(prefs.getString(KEY_PLAYER_PLAYBACK_MODE, PLAYER_PLAYBACK_MODE_NONE))
+        get() = PlayerPlaybackModes.normalize(prefs.getString(KEY_PLAYER_PLAYBACK_MODE, PLAYER_PLAYBACK_MODE_PARTS_LIST))
         set(value) = prefs.edit().putString(KEY_PLAYER_PLAYBACK_MODE, PlayerPlaybackModes.normalize(value)).apply()
 
     var playerSettingsApplyToGlobal: Boolean
