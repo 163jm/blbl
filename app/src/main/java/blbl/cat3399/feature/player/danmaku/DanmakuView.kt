@@ -397,11 +397,11 @@ class DanmakuView @JvmOverloads constructor(
         DanmakuConfig(
             enabled = true,
             opacity = 1f,
-            textSizeSp = 18f,
+            textSizeSp = 26f,
             fontWeight = DanmakuFontWeight.Bold,
             strokeWidthPx = 4,
             speedLevel = 4,
-            area = 1f,
+            area = 0.30f,
             laneDensity = DanmakuLaneDensity.Standard,
             showHighLikeIcon = true,
         )

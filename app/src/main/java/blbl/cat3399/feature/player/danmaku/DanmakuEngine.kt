@@ -99,16 +99,16 @@ internal class DanmakuEngine(
         DanmakuConfig(
             enabled = true,
             opacity = 1f,
-            textSizeSp = 18f,
+            textSizeSp = 26f,
             fontWeight = DanmakuFontWeight.Bold,
             strokeWidthPx = 4,
             speedLevel = 4,
-            area = 1f,
+            area = 0.30f,
             laneDensity = DanmakuLaneDensity.Standard,
             showHighLikeIcon = true,
         )
 
-    @Volatile private var textSizePx: Float = sp(18f)
+    @Volatile private var textSizePx: Float = sp(26f)
     @Volatile private var strokeWidthPx: Float = 4f
     @Volatile private var outlinePadPx: Float = 2f
 
