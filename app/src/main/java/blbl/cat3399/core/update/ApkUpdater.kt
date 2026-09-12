@@ -29,7 +29,7 @@ import kotlin.math.roundToInt
 object ApkUpdater {
     // GitHub 仓库：发布产物推送到该仓库的 release 分支（latest.txt + APK），
     // 同时也会创建 GitHub Release 作为兜底数据源。
-    private const val GITHUB_OWNER = "163jm"
+    private const val GITHUB_OWNER = "aazz77"
     private const val GITHUB_REPO = "blbl"
 
     private const val JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/$GITHUB_OWNER/$GITHUB_REPO@release"
